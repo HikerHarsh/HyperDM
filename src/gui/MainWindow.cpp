@@ -40,14 +40,6 @@ void MainWindow::onNewIpcConnection() {
             json payload = json::parse(data.toStdString());
             if (payload["action"] == "download") {
                 std::string url = payload["url"];
-                int row = downloadTable->rowCount();
-                downloadTable->insertRow(row);
-                downloadTable->setItem(row, 0, new QTableWidgetItem(QString::fromStdString(url)));
-                downloadTable->setItem(row, 1, new QTableWidgetItem("Calculating..."));
-                downloadTable->setItem(row, 2, new QTableWidgetItem("0%"));
-                downloadTable->setItem(row, 3, new QTableWidgetItem("0 KB/s"));
-                downloadTable->setItem(row, 4, new QTableWidgetItem("Starting..."));
-                
                 DownloadRequest req;
                 req.url = url;
                 if (payload.contains("headers")) {
@@ -55,6 +47,31 @@ void MainWindow::onNewIpcConnection() {
                         req.headers[el.key()] = el.value();
                     }
                 }
+                
+                // Show confirmation popup with save directory option
+                QMessageBox::StandardButton reply = QMessageBox::question(this, "HyperDM - New Download",
+                                      "Download this video?\n\nURL: " + QString::fromStdString(url.substr(0, 100)) + "...",
+                                      QMessageBox::Yes | QMessageBox::No);
+                if (reply == QMessageBox::No) {
+                    return;
+                }
+                
+                QString savePath = QFileDialog::getSaveFileName(this, "Save Video As",
+                                    QDir::homePath() + "/Downloads/video_download.mp4",
+                                    "Videos (*.mp4 *.mkv *.ts);;All Files (*.*)");
+                if (savePath.isEmpty()) {
+                    return;
+                }
+                req.output_path = savePath.toStdString();
+
+                // Add to table
+                int row = downloadTable->rowCount();
+                downloadTable->insertRow(row);
+                downloadTable->setItem(row, 0, new QTableWidgetItem(QString::fromStdString(url)));
+                downloadTable->setItem(row, 1, new QTableWidgetItem("Calculating..."));
+                downloadTable->setItem(row, 2, new QTableWidgetItem("0%"));
+                downloadTable->setItem(row, 3, new QTableWidgetItem("0 KB/s"));
+                downloadTable->setItem(row, 4, new QTableWidgetItem("Starting..."));
 
                 // Instantiate and keep it alive (in production, use a QList or QMap to track jobs)
                 DownloadJob* job = new DownloadJob(req, this);

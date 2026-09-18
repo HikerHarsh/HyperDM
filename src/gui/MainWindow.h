@@ -5,6 +5,10 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QLocalServer>
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QInputDialog>
+#include "../core/DownloadJob.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
