@@ -46,9 +46,35 @@ void MainWindow::onNewIpcConnection() {
                 downloadTable->setItem(row, 1, new QTableWidgetItem("Calculating..."));
                 downloadTable->setItem(row, 2, new QTableWidgetItem("0%"));
                 downloadTable->setItem(row, 3, new QTableWidgetItem("0 KB/s"));
-                downloadTable->setItem(row, 4, new QTableWidgetItem("Queued"));
+                downloadTable->setItem(row, 4, new QTableWidgetItem("Starting..."));
                 
-                // TODO: Instantiate DownloadJob and bind signals
+                DownloadRequest req;
+                req.url = url;
+                if (payload.contains("headers")) {
+                    for (auto& el : payload["headers"].items()) {
+                        req.headers[el.key()] = el.value();
+                    }
+                }
+
+                // Instantiate and keep it alive (in production, use a QList or QMap to track jobs)
+                DownloadJob* job = new DownloadJob(req, this);
+                
+                connect(job, &DownloadJob::progressUpdated, this, [this, row](double percentage) {
+                    // This signal is emitted from worker threads, but Qt will queue it to the main thread safely
+                    downloadTable->item(row, 2)->setText(QString::number(percentage, 'f', 1) + "%");
+                    downloadTable->item(row, 4)->setText("Downloading");
+                });
+                
+                connect(job, &DownloadJob::downloadCompleted, this, [this, row](const QString& path) {
+                    downloadTable->item(row, 2)->setText("100%");
+                    downloadTable->item(row, 4)->setText("Completed");
+                });
+                
+                connect(job, &DownloadJob::downloadError, this, [this, row](const QString& err) {
+                    downloadTable->item(row, 4)->setText("Error: " + err);
+                });
+
+                job->start();
             }
         } catch (...) {
             // parsing failed

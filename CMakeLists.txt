@@ -14,7 +14,7 @@ add_library(CoreLib
     src/core/ChunkManager.cpp
     src/core/HlsParser.cpp
 )
-target_link_libraries(CoreLib PRIVATE CURL::libcurl)
+target_link_libraries(CoreLib PRIVATE CURL::libcurl Qt6::Core)
 
 # Define Native Host Executable
 add_executable(NativeHost 

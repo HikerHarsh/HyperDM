@@ -1,32 +1,43 @@
 #pragma once
+#include <QObject>
+#include <QString>
 #include <string>
 #include <vector>
 #include <map>
+#include <atomic>
+#include <mutex>
+#include "ChunkManager.h"
 
 struct DownloadRequest {
     std::string url;
     std::map<std::string, std::string> headers;
-    std::string user_agent;
-    std::string referer;
-    std::string cookie;
     std::string output_path;
 };
 
-class DownloadJob {
+class DownloadJob : public QObject {
+    Q_OBJECT
 public:
-    DownloadJob(const DownloadRequest& req);
-    ~DownloadJob();
+    explicit DownloadJob(const DownloadRequest& req, QObject* parent = nullptr);
+    ~DownloadJob() override;
 
     void start();
-    void pause();
-    void resume();
-    
-    double get_progress() const;
-    
+
+signals:
+    void progressUpdated(double percentage);
+    void downloadCompleted(const QString& finalFilePath);
+    void downloadError(const QString& errorMessage);
+
 private:
-    void worker_thread(int chunk_index, size_t start_byte, size_t end_byte);
-    
+    void worker_thread(int thread_id);
+    void merge_chunks();
+    void fetch_file_size();
+
     DownloadRequest request;
     size_t total_size = 0;
-    std::vector<size_t> chunk_progress;
+    std::atomic<bool> is_running;
+    ChunkManager* chunk_manager = nullptr;
+    
+    std::atomic<int> active_threads;
+    std::mutex mtx;
+    std::string temp_dir;
 };
