@@ -14,47 +14,40 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                 headers[header.name] = header.value;
             }
             
-            // Format extraction for YouTube/General using regex
-            let format = "Unknown Format";
+            // Robust Format extraction for YouTube using URLSearchParams
+            let format = "Video/Media";
             
-            // Aggressive regex to find itag or mime anywhere in the URL
-            let itagMatch = url.match(/itag[=%3D]+([0-9]+)/);
-            let mimeMatch = url.match(/mime[=%3D]+([^&%]+)/);
-            
-            if (itagMatch) {
-                let itag = itagMatch[1];
-                if (itag === "137") format = "1080p Video (MP4)";
-                else if (itag === "299") format = "1080p60 Video (MP4)";
-                else if (itag === "313" || itag === "336") format = "4K Video (WebM)";
-                else if (itag === "571" || itag === "272") format = "8K Video (WebM)";
-                else if (itag === "136") format = "720p Video (MP4)";
-                else if (itag === "140") format = "Audio Only (m4a)";
-                else if (itag === "251") format = "Audio Only (webm)";
-                else if (itag === "18") format = "360p Video (MP4)";
-                else if (itag === "22") format = "720p Video (MP4)";
-                else if (mimeMatch) format = decodeURIComponent(mimeMatch[1]) + " (itag=" + itag + ")";
-                else format = "Stream (itag=" + itag + ")";
-            } else if (mimeMatch) {
-                format = decodeURIComponent(mimeMatch[1]);
-            } else if (url.includes(".m3u8")) {
-                format = "HLS Playlist";
-            } else if (url.includes(".mp4")) {
-                format = "MP4 Video";
-            } else {
-                // Debug fallback to see what we are catching
-                let queryMatch = url.match(/\?([^#]*)/);
-                if (queryMatch) {
-                    format = "Media: ?" + queryMatch[1].substring(0, 20) + "...";
+            try {
+                let urlObj = new URL(url);
+                let itag = urlObj.searchParams.get("itag");
+                let mime = urlObj.searchParams.get("mime");
+                
+                if (itag) {
+                    if (itag === "137") format = "1080p Video (MP4)";
+                    else if (itag === "299") format = "1080p60 Video (MP4)";
+                    else if (itag === "313" || itag === "336") format = "4K Video (WebM)";
+                    else if (itag === "571" || itag === "272") format = "8K Video (WebM)";
+                    else if (itag === "136") format = "720p Video (MP4)";
+                    else if (itag === "140") format = "Audio Only (m4a)";
+                    else if (itag === "251") format = "Audio Only (webm)";
+                    else if (itag === "18") format = "360p Video (MP4)";
+                    else if (itag === "22") format = "720p Video (MP4)";
+                    else if (mime) format = mime + " (itag=" + itag + ")";
+                    else format = "Stream (itag=" + itag + ")";
+                } else if (mime) {
+                    format = mime;
+                } else if (url.includes(".m3u8")) {
+                    format = "HLS Playlist";
+                } else if (url.includes(".mp4")) {
+                    format = "MP4 Video";
                 } else {
-                    format = "Video/Media (Base)";
+                    format = "Media Stream";
                 }
+            } catch(e) {
+                format = "Unknown Media";
             }
             
-            // Only keep useful streams (skip junk chunks without itag/mime)
-            if (format.startsWith("Media: ?") || format === "Unknown Format" || format === "Video/Media (Base)") {
-                return; // Ignore
-            }
-            
+            // Allow all streams so we don't get "Koi stream nahi mili"
             // Critical IDM Fix: Strip chunk range parameters so C++ downloads FULL video
             let cleanUrl = url.replace(/(?:[?&]|%26)range(?:=|%3D)[0-9]+-[0-9]+/, '');
             
