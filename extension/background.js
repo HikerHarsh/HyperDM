@@ -14,16 +14,24 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                 headers[header.name] = header.value;
             }
             
-            // Format extraction for YouTube/General
+            // Format extraction for YouTube/General using regex
             let format = "Video/Media";
-            if (url.includes("itag=137")) format = "1080p Video";
-            else if (url.includes("itag=299")) format = "1080p60 Video";
-            else if (url.includes("itag=313") || url.includes("itag=336")) format = "4K / 1440p Video";
-            else if (url.includes("itag=571") || url.includes("itag=272")) format = "8K Video";
-            else if (url.includes("itag=136")) format = "720p Video";
-            else if (url.includes("itag=140")) format = "Audio Only (m4a)";
-            else if (url.includes("itag=251")) format = "Audio Only (webm)";
-            else if (url.includes(".m3u8")) format = "HLS Stream";
+            let itagMatch = url.match(/itag(?:=|%3D)([0-9]+)/);
+            if (itagMatch) {
+                let itag = itagMatch[1];
+                if (itag === "137") format = "1080p Video";
+                else if (itag === "299") format = "1080p60 Video";
+                else if (itag === "313" || itag === "336") format = "4K Video";
+                else if (itag === "571" || itag === "272") format = "8K Video";
+                else if (itag === "136") format = "720p Video";
+                else if (itag === "140") format = "Audio (m4a)";
+                else if (itag === "251") format = "Audio (webm)";
+                else format = "Stream (itag=" + itag + ")";
+            } else if (url.includes(".m3u8")) {
+                format = "HLS Playlist";
+            } else if (url.includes("mime=audio")) {
+                format = "Audio Stream";
+            }
             
             const mediaItem = {
                 url: url,

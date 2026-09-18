@@ -1,7 +1,5 @@
 .hyperdm-download-btn {
-    position: fixed;
-    top: 60px;
-    right: 20px;
+    position: absolute;
     z-index: 99999999;
     background-color: #0078D7;
     color: white;
