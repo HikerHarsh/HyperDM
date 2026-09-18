@@ -3,8 +3,10 @@
 #include <cstdint>
 #include <vector>
 #include <nlohmann/json.hpp>
-#include <curl/curl.h>
-#include "../src/core/DownloadJob.h"
+#include <QCoreApplication>
+#include <QLocalSocket>
+#include <QProcess>
+#include "../src/ipc/IpcDefines.h"
 
 #ifdef _WIN32
 #include <io.h>
@@ -32,13 +34,13 @@ void write_message(const std::string& msg) {
     std::cout.flush();
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    QCoreApplication app(argc, argv); // Needed for QLocalSocket event loop handling if async
+
 #ifdef _WIN32
     _setmode(_fileno(stdin), _O_BINARY);
     _setmode(_fileno(stdout), _O_BINARY);
 #endif
-
-    curl_global_init(CURL_GLOBAL_ALL);
 
     while (true) {
         std::string msg = read_message();
@@ -48,24 +50,40 @@ int main() {
             json payload = json::parse(msg);
             
             if (payload["action"] == "download") {
-                DownloadRequest req;
-                req.url = payload["url"];
+                // Forward the request to the main GUI instance via IPC
+                QLocalSocket socket;
+                socket.connectToServer(HyperDM::IPC_SERVER_NAME);
                 
-                if (payload.contains("headers")) {
-                    for (auto& el : payload["headers"].items()) {
-                        req.headers[el.key()] = el.value();
-                    }
+                if (!socket.waitForConnected(1000)) {
+                    // GUI might not be running. Start it.
+                    // Assuming HyperDM_GUI is in the same directory.
+                    QProcess::startDetached("HyperDM_GUI.exe", QStringList());
+                    
+                    // Give it a moment to start the IPC server
+                    QThread::msleep(1000);
+                    socket.connectToServer(HyperDM::IPC_SERVER_NAME);
+                    socket.waitForConnected(2000);
                 }
-                
-                // For Phase 2, we just instantiate and start (blocking for now)
-                DownloadJob job(req);
-                job.start();
-                
-                json response = {
-                    {"status", "success"},
-                    {"message", "Download job started successfully"}
-                };
-                write_message(response.dump());
+
+                if (socket.state() == QLocalSocket::ConnectedState) {
+                    QByteArray block;
+                    block.append(QString::fromStdString(msg).toUtf8());
+                    socket.write(block);
+                    socket.waitForBytesWritten();
+                    socket.disconnectFromServer();
+                    
+                    json response = {
+                        {"status", "success"},
+                        {"message", "Sent to HyperDM GUI"}
+                    };
+                    write_message(response.dump());
+                } else {
+                    json error_resp = {
+                        {"status", "error"},
+                        {"message", "Failed to connect to HyperDM GUI"}
+                    };
+                    write_message(error_resp.dump());
+                }
             }
         } catch (const std::exception& e) {
             json error_resp = {
@@ -76,6 +94,5 @@ int main() {
         }
     }
 
-    curl_global_cleanup();
     return 0;
 }

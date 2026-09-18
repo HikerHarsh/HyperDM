@@ -3,12 +3,60 @@
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QMessageBox>
+#include <QLocalSocket>
+#include <nlohmann/json.hpp>
+#include "../ipc/IpcDefines.h"
+#include "../core/DownloadJob.h"
+
+using json = nlohmann::json;
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setupUi();
+    setupIpc();
     setWindowTitle("HyperDM - Enterprise Video Downloader");
     resize(800, 600);
 }
+
+MainWindow::~MainWindow() {
+    if (ipcServer) {
+        ipcServer->close();
+        delete ipcServer;
+    }
+}
+
+void MainWindow::setupIpc() {
+    ipcServer = new QLocalServer(this);
+    QLocalServer::removeServer(HyperDM::IPC_SERVER_NAME); // Clean up stale server
+    if (ipcServer->listen(HyperDM::IPC_SERVER_NAME)) {
+        connect(ipcServer, &QLocalServer::newConnection, this, &MainWindow::onNewIpcConnection);
+    }
+}
+
+void MainWindow::onNewIpcConnection() {
+    QLocalSocket* clientSocket = ipcServer->nextPendingConnection();
+    connect(clientSocket, &QLocalSocket::readyRead, this, [this, clientSocket]() {
+        QByteArray data = clientSocket->readAll();
+        try {
+            json payload = json::parse(data.toStdString());
+            if (payload["action"] == "download") {
+                std::string url = payload["url"];
+                int row = downloadTable->rowCount();
+                downloadTable->insertRow(row);
+                downloadTable->setItem(row, 0, new QTableWidgetItem(QString::fromStdString(url)));
+                downloadTable->setItem(row, 1, new QTableWidgetItem("Calculating..."));
+                downloadTable->setItem(row, 2, new QTableWidgetItem("0%"));
+                downloadTable->setItem(row, 3, new QTableWidgetItem("0 KB/s"));
+                downloadTable->setItem(row, 4, new QTableWidgetItem("Queued"));
+                
+                // TODO: Instantiate DownloadJob and bind signals
+            }
+        } catch (...) {
+            // parsing failed
+        }
+    });
+    connect(clientSocket, &QLocalSocket::disconnected, clientSocket, &QLocalSocket::deleteLater);
+}
+
 
 void MainWindow::setupUi() {
     QWidget* centralWidget = new QWidget(this);

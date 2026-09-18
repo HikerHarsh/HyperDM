@@ -20,7 +20,7 @@ target_link_libraries(CoreLib PRIVATE CURL::libcurl)
 add_executable(NativeHost 
     native_host/main.cpp
 )
-target_link_libraries(NativeHost PRIVATE CoreLib nlohmann_json::nlohmann_json)
+target_link_libraries(NativeHost PRIVATE nlohmann_json::nlohmann_json Qt6::Core)
 
 # Define Qt GUI Executable
 add_executable(HyperDM_GUI
