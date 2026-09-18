@@ -7,6 +7,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Find packages
 find_package(CURL REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
+
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
 
 # Core Library
 add_library(CoreLib
