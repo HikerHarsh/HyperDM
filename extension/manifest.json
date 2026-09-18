@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "HyperDM - Video Grabber",
+  "version": "1.0",
+  "description": "Extracts video URLs and headers to send to HyperDM Core.",
+  "permissions": [
+    "webRequest",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "*://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
