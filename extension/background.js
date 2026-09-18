@@ -16,21 +16,30 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
             
             // Format extraction for YouTube/General using regex
             let format = "Video/Media";
-            let itagMatch = url.match(/itag(?:=|%3D)([0-9]+)/);
+            
+            // Try to extract itag
+            let itagMatch = url.match(/(?:[?&]|%26)itag(?:=|%3D)([0-9]+)/);
+            let mimeMatch = url.match(/(?:[?&]|%26)mime(?:=|%3D)([^&]+)/);
+            
             if (itagMatch) {
                 let itag = itagMatch[1];
-                if (itag === "137") format = "1080p Video";
-                else if (itag === "299") format = "1080p60 Video";
-                else if (itag === "313" || itag === "336") format = "4K Video";
-                else if (itag === "571" || itag === "272") format = "8K Video";
-                else if (itag === "136") format = "720p Video";
-                else if (itag === "140") format = "Audio (m4a)";
-                else if (itag === "251") format = "Audio (webm)";
+                if (itag === "137") format = "1080p Video (MP4)";
+                else if (itag === "299") format = "1080p60 Video (MP4)";
+                else if (itag === "313" || itag === "336") format = "4K Video (WebM)";
+                else if (itag === "571" || itag === "272") format = "8K Video (WebM)";
+                else if (itag === "136") format = "720p Video (MP4)";
+                else if (itag === "140") format = "Audio Only (m4a)";
+                else if (itag === "251") format = "Audio Only (webm)";
+                else if (itag === "18") format = "360p Video (MP4)";
+                else if (itag === "22") format = "720p Video (MP4)";
+                else if (mimeMatch) format = decodeURIComponent(mimeMatch[1]) + " (itag=" + itag + ")";
                 else format = "Stream (itag=" + itag + ")";
+            } else if (mimeMatch) {
+                format = decodeURIComponent(mimeMatch[1]);
             } else if (url.includes(".m3u8")) {
                 format = "HLS Playlist";
-            } else if (url.includes("mime=audio")) {
-                format = "Audio Stream";
+            } else if (url.includes(".mp4")) {
+                format = "MP4 Video";
             }
             
             const mediaItem = {
