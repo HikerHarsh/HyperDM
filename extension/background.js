@@ -15,11 +15,11 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
             }
             
             // Format extraction for YouTube/General using regex
-            let format = "Video/Media";
+            let format = "Unknown Format";
             
-            // Try to extract itag
-            let itagMatch = url.match(/(?:[?&]|%26)itag(?:=|%3D)([0-9]+)/);
-            let mimeMatch = url.match(/(?:[?&]|%26)mime(?:=|%3D)([^&]+)/);
+            // Aggressive regex to find itag or mime anywhere in the URL
+            let itagMatch = url.match(/itag[=%3D]+([0-9]+)/);
+            let mimeMatch = url.match(/mime[=%3D]+([^&%]+)/);
             
             if (itagMatch) {
                 let itag = itagMatch[1];
@@ -40,6 +40,14 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                 format = "HLS Playlist";
             } else if (url.includes(".mp4")) {
                 format = "MP4 Video";
+            } else {
+                // Debug fallback to see what we are catching
+                let queryMatch = url.match(/\?([^#]*)/);
+                if (queryMatch) {
+                    format = "Media: ?" + queryMatch[1].substring(0, 20) + "...";
+                } else {
+                    format = "Video/Media (Base)";
+                }
             }
             
             const mediaItem = {
