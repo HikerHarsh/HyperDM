@@ -12,6 +12,7 @@ find_package(nlohmann_json REQUIRED)
 add_library(CoreLib
     src/core/DownloadJob.cpp
     src/core/ChunkManager.cpp
+    src/core/HlsParser.cpp
 )
 target_link_libraries(CoreLib PRIVATE CURL::libcurl)
 
@@ -20,3 +21,11 @@ add_executable(NativeHost
     native_host/main.cpp
 )
 target_link_libraries(NativeHost PRIVATE CoreLib nlohmann_json::nlohmann_json)
+
+# Define Qt GUI Executable
+add_executable(HyperDM_GUI
+    src/gui/main.cpp
+    src/gui/MainWindow.cpp
+    src/gui/MainWindow.h
+)
+target_link_libraries(HyperDM_GUI PRIVATE CoreLib Qt6::Widgets)
