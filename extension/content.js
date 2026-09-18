@@ -67,34 +67,77 @@ function createUI() {
     });
 }
 
-// Watch for mouse movements to show the button over videos
+// Track mouse position globally
+let mouseX = 0;
+let mouseY = 0;
+
 document.addEventListener('mousemove', (e) => {
-    let target = e.target;
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+});
+
+function checkHover() {
+    let isOverUI = false;
     
-    // Check if we are hovering over a video or our own UI
-    let isOverVideo = target && target.tagName && target.tagName.toLowerCase() === 'video';
-    let isOverUI = target === downloadBtn || target === dropdown || (dropdown && dropdown.contains(target));
+    // Check if mouse is over our own button or dropdown
+    if (downloadBtn && downloadBtn.style.display !== 'none') {
+        let btnRect = downloadBtn.getBoundingClientRect();
+        if (mouseX >= btnRect.left && mouseX <= btnRect.right && mouseY >= btnRect.top && mouseY <= btnRect.bottom) {
+            isOverUI = true;
+        }
+    }
+    if (dropdown && dropdown.style.display !== 'none') {
+        let dropRect = dropdown.getBoundingClientRect();
+        if (mouseX >= dropRect.left && mouseX <= dropRect.right && mouseY >= dropRect.top && mouseY <= dropRect.bottom) {
+            isOverUI = true;
+        }
+    }
     
-    if (isOverVideo) {
-        createUI();
-        currentVideo = target;
-        const rect = currentVideo.getBoundingClientRect();
-        
-        // Position at the top-right of the video element
-        downloadBtn.style.top = (rect.top + window.scrollY + 10) + 'px';
-        downloadBtn.style.left = (rect.right + window.scrollX - 180) + 'px'; // roughly button width
-        downloadBtn.style.display = 'flex';
-        
+    // If dropdown is open, keep everything visible
+    if (dropdown && dropdown.style.display === 'block') {
+        return;
+    }
+
+    if (isOverUI) {
         clearTimeout(hoverTimer);
-    } else if (!isOverUI) {
-        // If mouse leaves the video and UI, hide after 2 seconds
+        return;
+    }
+
+    const videos = document.querySelectorAll('video');
+    let foundVideo = false;
+
+    for (let i = 0; i < videos.length; i++) {
+        let video = videos[i];
+        let rect = video.getBoundingClientRect();
+        
+        // If mouse is inside the video bounds
+        if (rect.width > 100 && rect.height > 100 &&
+            mouseX >= rect.left && mouseX <= rect.right &&
+            mouseY >= rect.top && mouseY <= rect.bottom) {
+            
+            foundVideo = true;
+            createUI();
+            
+            // Position at top-right of this video
+            downloadBtn.style.top = (rect.top + window.scrollY + 10) + 'px';
+            downloadBtn.style.left = (rect.right + window.scrollX - 180) + 'px';
+            downloadBtn.style.display = 'flex';
+            
+            clearTimeout(hoverTimer);
+            break;
+        }
+    }
+    
+    if (!foundVideo) {
         if (downloadBtn && downloadBtn.style.display !== 'none') {
             clearTimeout(hoverTimer);
             hoverTimer = setTimeout(() => {
+                if (dropdown && dropdown.style.display === 'block') return; // Don't hide if dropdown is open
                 downloadBtn.style.display = 'none';
-                dropdown.style.display = 'none';
-            }, 2000);
+            }, 1000);
         }
     }
-});
+}
+
+setInterval(checkHover, 500);
 
