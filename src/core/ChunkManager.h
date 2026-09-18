@@ -31,5 +31,5 @@ private:
     size_t total_size;
     int num_threads;
     std::vector<ChunkRange> chunks;
-    std::mutex mtx;
+    mutable std::mutex mtx;
 };
