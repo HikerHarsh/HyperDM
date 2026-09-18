@@ -1,14 +1,84 @@
+// content.js — Runs in ISOLATED WORLD
+// Injects injected.js into MAIN WORLD, receives format data, shows IDM-style hover UI
+
 let downloadBtn = null;
 let dropdown = null;
-let cachedMedia = [];
+let videoFormats = [];
+let videoTitle = 'Unknown Video';
 let hoverTimer = null;
-let currentVideo = null;
 let isMouseOverUI = false;
 
+// ==================== STEP 1: Inject Main World Script ====================
+function injectMainWorldScript() {
+    const script = document.createElement('script');
+    script.src = chrome.runtime.getURL('injected.js');
+    script.onload = () => script.remove(); // Clean up
+    (document.head || document.documentElement).appendChild(script);
+}
+
+injectMainWorldScript();
+
+// Re-inject on YouTube SPA navigation
+const observer = new MutationObserver(() => {
+    let url = location.href;
+    if (observer._lastUrl !== url) {
+        observer._lastUrl = url;
+        videoFormats = []; // Reset
+        setTimeout(injectMainWorldScript, 1000);
+    }
+});
+observer._lastUrl = location.href;
+observer.observe(document.body, { childList: true, subtree: true });
+
+// ==================== STEP 2: Listen for Format Data from Injected Script ====================
+window.addEventListener('message', (event) => {
+    if (event.source !== window || !event.data || event.data.source !== 'HYPERDM_INJECTED') return;
+    
+    videoTitle = event.data.videoTitle || 'Unknown Video';
+    let rawFormats = event.data.formats || [];
+    
+    // Process and clean up formats for display
+    videoFormats = [];
+    for (let f of rawFormats) {
+        if (!f.url) continue; // Skip formats without direct URL (cipher/signature required)
+        
+        let label = '';
+        let sizeBytes = parseInt(f.contentLength) || 0;
+        let sizeMB = sizeBytes > 0 ? (sizeBytes / (1024 * 1024)).toFixed(1) + ' MB' : 'Unknown size';
+        
+        if (f.type === 'muxed') {
+            label = '🎬 ' + (f.qualityLabel || f.quality) + ' (Video+Audio) — ' + sizeMB;
+        } else if (f.type === 'audio') {
+            let bitrate = f.bitrate ? Math.round(f.bitrate / 1000) + 'kbps' : '';
+            label = '🔊 Audio ' + bitrate + ' — ' + sizeMB;
+        } else {
+            label = '🎥 ' + (f.qualityLabel || f.quality || f.height + 'p') + ' (Video Only) — ' + sizeMB;
+        }
+        
+        videoFormats.push({
+            label: label,
+            url: f.url,
+            qualityLabel: f.qualityLabel || '',
+            contentLength: sizeBytes,
+            mimeType: f.mimeType || '',
+            type: f.type
+        });
+    }
+    
+    // Sort: muxed first, then video by height desc, then audio
+    videoFormats.sort((a, b) => {
+        if (a.type === 'muxed' && b.type !== 'muxed') return -1;
+        if (a.type !== 'muxed' && b.type === 'muxed') return 1;
+        if (a.type === 'audio' && b.type !== 'audio') return 1;
+        if (a.type !== 'audio' && b.type === 'audio') return -1;
+        return b.contentLength - a.contentLength;
+    });
+});
+
+// ==================== STEP 3: IDM-Style Hover UI ====================
 function createUI() {
     if (downloadBtn) return;
     
-    // The main hover button
     downloadBtn = document.createElement('button');
     downloadBtn.className = 'hyperdm-download-btn';
     downloadBtn.innerHTML = '⬇ Download this video';
@@ -16,7 +86,6 @@ function createUI() {
     downloadBtn.style.display = 'none';
     document.body.appendChild(downloadBtn);
     
-    // The dropdown menu
     dropdown = document.createElement('div');
     dropdown.className = 'hyperdm-dropdown';
     dropdown.style.position = 'absolute';
@@ -29,80 +98,90 @@ function createUI() {
     dropdown.addEventListener('mouseenter', () => { isMouseOverUI = true; });
     dropdown.addEventListener('mouseleave', () => { isMouseOverUI = false; });
     
-    // Click on the download button
+    // Click handler
     downloadBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         
-        chrome.runtime.sendMessage({action: "getMediaList"}, (response) => {
-            cachedMedia = response ? (response.media || []) : [];
+        if (videoFormats.length === 0) {
+            // Retry injection
+            injectMainWorldScript();
+            setTimeout(() => {
+                if (videoFormats.length === 0) {
+                    alert('Formats load nahi hue! Page refresh karke dobara try karein.');
+                }
+            }, 2000);
+            return;
+        }
+        
+        dropdown.innerHTML = '';
+        
+        // Title header
+        let header = document.createElement('div');
+        header.style.cssText = 'padding:8px 12px;font-weight:bold;border-bottom:2px solid #0078D7;color:#0078D7;font-size:13px;';
+        header.textContent = '📹 ' + videoTitle;
+        dropdown.appendChild(header);
+        
+        for (let fmt of videoFormats) {
+            let item = document.createElement('div');
+            item.className = 'hyperdm-dropdown-item';
+            item.textContent = fmt.label;
             
-            if (cachedMedia.length === 0) {
-                alert("Koi stream catch nahi hui! Video quality change karke dekhein.");
-                return;
-            }
-            
-            dropdown.innerHTML = '';
-            cachedMedia.forEach((media, index) => {
-                let item = document.createElement('div');
-                item.className = 'hyperdm-dropdown-item';
-                item.innerHTML = `<span>${media.format}</span>`;
+            item.addEventListener('click', (ev) => {
+                ev.stopPropagation();
                 
-                item.addEventListener('click', (ev) => {
-                    ev.stopPropagation();
-                    chrome.runtime.sendMessage({
-                        action: "downloadMedia",
-                        media: media
-                    }, () => {
-                        dropdown.style.display = 'none';
-                        downloadBtn.style.display = 'none';
-                    });
+                // Send to C++ app via Native Messaging
+                chrome.runtime.sendMessage({
+                    action: "downloadMedia",
+                    media: {
+                        url: fmt.url,
+                        format: fmt.label,
+                        title: videoTitle,
+                        mimeType: fmt.mimeType,
+                        contentLength: fmt.contentLength,
+                        headers: {}
+                    }
+                }, () => {
+                    dropdown.style.display = 'none';
+                    downloadBtn.style.display = 'none';
                 });
-                
-                dropdown.appendChild(item);
             });
             
-            const rect = downloadBtn.getBoundingClientRect();
-            dropdown.style.top = (rect.bottom + window.scrollY + 5) + 'px';
-            dropdown.style.left = (rect.left + window.scrollX) + 'px';
-            dropdown.style.display = 'block';
-        });
+            dropdown.appendChild(item);
+        }
+        
+        const rect = downloadBtn.getBoundingClientRect();
+        dropdown.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+        dropdown.style.left = (rect.left + window.scrollX) + 'px';
+        dropdown.style.display = 'block';
     });
     
-    // Hide dropdown on outside click
+    // Hide on outside click
     document.addEventListener('click', () => {
         if (dropdown) dropdown.style.display = 'none';
     });
 }
 
-// Watch for mouse movements to show the button over videos
+// ==================== STEP 4: Mouse Hover Detection ====================
 document.addEventListener('mousemove', (e) => {
     let target = e.target;
-    
-    // Check if we are hovering over a video
     let isOverVideo = target && target.tagName && target.tagName.toLowerCase() === 'video';
     
     if (isOverVideo) {
         createUI();
-        currentVideo = target;
-        const rect = currentVideo.getBoundingClientRect();
-        
-        // Position at the top-right of the video element
+        const rect = target.getBoundingClientRect();
         downloadBtn.style.top = (rect.top + window.scrollY + 10) + 'px';
-        downloadBtn.style.left = (rect.right + window.scrollX - 180) + 'px'; // roughly button width
+        downloadBtn.style.left = (rect.right + window.scrollX - 195) + 'px';
         downloadBtn.style.display = 'flex';
-        
         clearTimeout(hoverTimer);
     } else if (!isMouseOverUI) {
-        // If mouse leaves the video and is NOT over our UI, start the hide timer
         if (downloadBtn && downloadBtn.style.display !== 'none') {
             clearTimeout(hoverTimer);
             hoverTimer = setTimeout(() => {
-                if (!isMouseOverUI) { // double check before hiding
+                if (!isMouseOverUI) {
                     downloadBtn.style.display = 'none';
                     dropdown.style.display = 'none';
                 }
-            }, 1000);
+            }, 1500);
         }
     }
 });
-

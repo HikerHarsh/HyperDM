@@ -1,15 +1,15 @@
 {
   "manifest_version": 3,
   "name": "HyperDM - Video Grabber",
-  "version": "1.1",
+  "version": "2.0",
   "description": "Intercepts video streams and sends them to HyperDM C++ Engine",
   "permissions": [
-    "webRequest",
     "nativeMessaging",
     "tabs",
     "storage"
   ],
   "host_permissions": [
+    "*://*.youtube.com/*",
     "<all_urls>"
   ],
   "background": {
@@ -17,10 +17,16 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": ["*://*.youtube.com/*"],
       "css": ["content.css"],
       "js": ["content.js"],
-      "all_frames": true
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.js"],
+      "matches": ["*://*.youtube.com/*"]
     }
   ]
 }
