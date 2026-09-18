@@ -1,4 +1,3 @@
-let activeVideo = null;
 let downloadBtn = null;
 let dropdown = null;
 let cachedMedia = [];
@@ -8,7 +7,7 @@ function createUI() {
     
     downloadBtn = document.createElement('button');
     downloadBtn.className = 'hyperdm-download-btn';
-    downloadBtn.innerHTML = '⬇ Download Video';
+    downloadBtn.innerHTML = '⬇ HyperDM Download';
     document.body.appendChild(downloadBtn);
     
     dropdown = document.createElement('div');
@@ -19,10 +18,10 @@ function createUI() {
         e.stopPropagation();
         
         chrome.runtime.sendMessage({action: "getMediaList"}, (response) => {
-            cachedMedia = response.media || [];
+            cachedMedia = response ? (response.media || []) : [];
             
             if (cachedMedia.length === 0) {
-                alert("No media streams caught yet. Try playing the video.");
+                alert("Koi media stream nahi mili! Video play karke thoda wait karein ya page refresh karein.");
                 return;
             }
             
@@ -37,7 +36,6 @@ function createUI() {
                         action: "downloadMedia",
                         media: media
                     }, () => {
-                        alert("Sent to HyperDM!");
                         dropdown.style.display = 'none';
                     });
                 });
@@ -46,8 +44,9 @@ function createUI() {
             });
             
             const rect = downloadBtn.getBoundingClientRect();
-            dropdown.style.top = (rect.bottom + window.scrollY + 5) + 'px';
-            dropdown.style.left = (rect.left + window.scrollX) + 'px';
+            dropdown.style.top = (rect.bottom + 5) + 'px';
+            dropdown.style.left = rect.left + 'px';
+            dropdown.style.position = 'fixed'; // Important for fixed dropdown
             dropdown.style.display = 'block';
         });
     });
@@ -57,29 +56,14 @@ function createUI() {
     });
 }
 
-function updateButtonPosition(video) {
-    if (!downloadBtn) return;
-    const rect = video.getBoundingClientRect();
-    if (rect.width > 100 && rect.height > 100) {
-        downloadBtn.style.top = (rect.top + window.scrollY + 10) + 'px';
-        downloadBtn.style.left = (rect.right + window.scrollX - downloadBtn.offsetWidth - 10) + 'px';
-        downloadBtn.style.display = 'flex';
-    } else {
-        downloadBtn.style.display = 'none';
-    }
-}
-
 function checkVideos() {
     const videos = document.querySelectorAll('video');
     if (videos.length > 0) {
         createUI();
-        let playingVideo = Array.from(videos).find(v => !v.paused) || videos[0];
-        
-        if (playingVideo) {
-            updateButtonPosition(playingVideo);
-        }
     }
 }
 
-// Check every second to keep button attached to video player
-setInterval(checkVideos, 1000);
+// Initial check and periodic check
+setTimeout(checkVideos, 2000);
+setInterval(checkVideos, 3000);
+
