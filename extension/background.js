@@ -50,8 +50,16 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                 }
             }
             
+            // Only keep useful streams (skip junk chunks without itag/mime)
+            if (format.startsWith("Media: ?") || format === "Unknown Format" || format === "Video/Media (Base)") {
+                return; // Ignore
+            }
+            
+            // Critical IDM Fix: Strip chunk range parameters so C++ downloads FULL video
+            let cleanUrl = url.replace(/(?:[?&]|%26)range(?:=|%3D)[0-9]+-[0-9]+/, '');
+            
             const mediaItem = {
-                url: url,
+                url: cleanUrl,
                 headers: headers,
                 format: format,
                 timestamp: Date.now()
@@ -59,8 +67,8 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
             
             if (!tabMediaData[tabId]) tabMediaData[tabId] = [];
             
-            // Avoid duplicate exact URLs
-            if (!tabMediaData[tabId].some(item => item.url === url)) {
+            // Avoid duplicate formats
+            if (!tabMediaData[tabId].some(item => item.format === format)) {
                 tabMediaData[tabId].push(mediaItem);
             }
         }

@@ -3,6 +3,7 @@ let dropdown = null;
 let cachedMedia = [];
 let hoverTimer = null;
 let currentVideo = null;
+let isMouseOverUI = false;
 
 function createUI() {
     if (downloadBtn) return;
@@ -21,6 +22,12 @@ function createUI() {
     dropdown.style.position = 'absolute';
     dropdown.style.display = 'none';
     document.body.appendChild(dropdown);
+    
+    // Keep UI visible when mouse is over it
+    downloadBtn.addEventListener('mouseenter', () => { isMouseOverUI = true; });
+    downloadBtn.addEventListener('mouseleave', () => { isMouseOverUI = false; });
+    dropdown.addEventListener('mouseenter', () => { isMouseOverUI = true; });
+    dropdown.addEventListener('mouseleave', () => { isMouseOverUI = false; });
     
     // Click on the download button
     downloadBtn.addEventListener('click', (e) => {
@@ -67,77 +74,35 @@ function createUI() {
     });
 }
 
-// Track mouse position globally
-let mouseX = 0;
-let mouseY = 0;
-
+// Watch for mouse movements to show the button over videos
 document.addEventListener('mousemove', (e) => {
-    mouseX = e.clientX;
-    mouseY = e.clientY;
-});
-
-function checkHover() {
-    let isOverUI = false;
+    let target = e.target;
     
-    // Check if mouse is over our own button or dropdown
-    if (downloadBtn && downloadBtn.style.display !== 'none') {
-        let btnRect = downloadBtn.getBoundingClientRect();
-        if (mouseX >= btnRect.left && mouseX <= btnRect.right && mouseY >= btnRect.top && mouseY <= btnRect.bottom) {
-            isOverUI = true;
-        }
-    }
-    if (dropdown && dropdown.style.display !== 'none') {
-        let dropRect = dropdown.getBoundingClientRect();
-        if (mouseX >= dropRect.left && mouseX <= dropRect.right && mouseY >= dropRect.top && mouseY <= dropRect.bottom) {
-            isOverUI = true;
-        }
-    }
+    // Check if we are hovering over a video
+    let isOverVideo = target && target.tagName && target.tagName.toLowerCase() === 'video';
     
-    // If dropdown is open, keep everything visible
-    if (dropdown && dropdown.style.display === 'block') {
-        return;
-    }
-
-    if (isOverUI) {
-        clearTimeout(hoverTimer);
-        return;
-    }
-
-    const videos = document.querySelectorAll('video');
-    let foundVideo = false;
-
-    for (let i = 0; i < videos.length; i++) {
-        let video = videos[i];
-        let rect = video.getBoundingClientRect();
+    if (isOverVideo) {
+        createUI();
+        currentVideo = target;
+        const rect = currentVideo.getBoundingClientRect();
         
-        // If mouse is inside the video bounds
-        if (rect.width > 100 && rect.height > 100 &&
-            mouseX >= rect.left && mouseX <= rect.right &&
-            mouseY >= rect.top && mouseY <= rect.bottom) {
-            
-            foundVideo = true;
-            createUI();
-            
-            // Position at top-right of this video
-            downloadBtn.style.top = (rect.top + window.scrollY + 10) + 'px';
-            downloadBtn.style.left = (rect.right + window.scrollX - 180) + 'px';
-            downloadBtn.style.display = 'flex';
-            
-            clearTimeout(hoverTimer);
-            break;
-        }
-    }
-    
-    if (!foundVideo) {
+        // Position at the top-right of the video element
+        downloadBtn.style.top = (rect.top + window.scrollY + 10) + 'px';
+        downloadBtn.style.left = (rect.right + window.scrollX - 180) + 'px'; // roughly button width
+        downloadBtn.style.display = 'flex';
+        
+        clearTimeout(hoverTimer);
+    } else if (!isMouseOverUI) {
+        // If mouse leaves the video and is NOT over our UI, start the hide timer
         if (downloadBtn && downloadBtn.style.display !== 'none') {
             clearTimeout(hoverTimer);
             hoverTimer = setTimeout(() => {
-                if (dropdown && dropdown.style.display === 'block') return; // Don't hide if dropdown is open
-                downloadBtn.style.display = 'none';
+                if (!isMouseOverUI) { // double check before hiding
+                    downloadBtn.style.display = 'none';
+                    dropdown.style.display = 'none';
+                }
             }, 1000);
         }
     }
-}
-
-setInterval(checkHover, 500);
+});
 
