@@ -4,8 +4,9 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
     function(details) {
         const url = details.url;
         
-        // Simple filter for media files
-        if (url.includes(".mp4") || url.includes(".m3u8") || url.includes(".ts")) {
+        // Filter for standard media files AND YouTube videoplayback streams
+        if (url.includes(".mp4") || url.includes(".m3u8") || url.includes(".ts") || url.includes("videoplayback")) {
+            // Skip audio-only or very small chunks if needed, but for now catch all
             console.log("HyperDM caught media URL:", url);
             
             let headers = {};
