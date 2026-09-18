@@ -33,4 +33,4 @@ add_executable(HyperDM_GUI
     src/gui/MainWindow.cpp
     src/gui/MainWindow.h
 )
-target_link_libraries(HyperDM_GUI PRIVATE CoreLib Qt6::Widgets Qt6::Network)
+target_link_libraries(HyperDM_GUI PRIVATE CoreLib Qt6::Widgets Qt6::Network nlohmann_json::nlohmann_json)
