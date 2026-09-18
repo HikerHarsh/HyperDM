@@ -1,5 +1,5 @@
-// content.js — Runs in ISOLATED WORLD
-// Fetches YouTube page HTML to extract video formats reliably
+// content.js — Uses YouTube's Internal API (Innertube) for bulletproof format extraction
+// This is the same API that YouTube's own player uses internally
 
 let downloadBtn = null;
 let dropdown = null;
@@ -9,50 +9,48 @@ let hoverTimer = null;
 let isMouseOverUI = false;
 let lastVideoId = '';
 
-// ==================== STEP 1: Extract Formats by Fetching Page HTML ====================
+// ==================== STEP 1: Extract Formats via YouTube Innertube API ====================
 async function extractFormats() {
-    let videoId = '';
-    
-    // Get video ID from URL
     let urlParams = new URLSearchParams(window.location.search);
-    videoId = urlParams.get('v');
+    let videoId = urlParams.get('v');
     
     if (!videoId) return;
-    if (videoId === lastVideoId && videoFormats.length > 0) return; // Already extracted
+    if (videoId === lastVideoId && videoFormats.length > 0) return;
     lastVideoId = videoId;
     videoFormats = [];
     
     try {
-        // Fetch the page HTML directly - this always contains ytInitialPlayerResponse
-        let response = await fetch('https://www.youtube.com/watch?v=' + videoId, {
-            credentials: 'include' // Include cookies for age-restricted/premium content
+        // YouTube's internal player API — same one the player uses
+        let apiResponse = await fetch('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                context: {
+                    client: {
+                        clientName: 'WEB',
+                        clientVersion: '2.20240101.00.00',
+                        hl: 'en',
+                        gl: 'US'
+                    }
+                },
+                videoId: videoId
+            }),
+            credentials: 'include'
         });
-        let html = await response.text();
         
-        // Extract ytInitialPlayerResponse from HTML
-        let playerMatch = html.match(/var ytInitialPlayerResponse\s*=\s*(\{.+?\});/s);
-        if (!playerMatch) {
-            // Try alternative pattern
-            playerMatch = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});/s);
-        }
+        let data = await apiResponse.json();
         
-        if (!playerMatch) {
-            console.error('HyperDM: Could not find ytInitialPlayerResponse in page');
+        if (!data.streamingData) {
+            console.error('HyperDM: No streamingData in API response');
             return;
         }
         
-        let playerResponse = JSON.parse(playerMatch[1]);
-        let streamingData = playerResponse.streamingData;
-        let videoDetails = playerResponse.videoDetails || {};
+        let streamingData = data.streamingData;
+        videoTitle = (data.videoDetails && data.videoDetails.title) || 'Unknown Video';
         
-        if (!streamingData) {
-            console.error('HyperDM: No streamingData found');
-            return;
-        }
-        
-        videoTitle = videoDetails.title || 'Unknown Video';
-        
-        // Process muxed formats (video+audio combined, usually 360p/720p)
+        // Process muxed formats (video+audio combined)
         if (streamingData.formats) {
             for (let f of streamingData.formats) {
                 if (!f.url) continue;
@@ -60,7 +58,7 @@ async function extractFormats() {
                 let sizeMB = sizeBytes > 0 ? (sizeBytes / (1024 * 1024)).toFixed(1) + ' MB' : '';
                 
                 videoFormats.push({
-                    label: '🎬 ' + (f.qualityLabel || f.quality || 'Unknown') + ' (Video+Audio)' + (sizeMB ? ' — ' + sizeMB : ''),
+                    label: '🎬 ' + (f.qualityLabel || f.quality || '?') + ' (Video+Audio)' + (sizeMB ? ' — ' + sizeMB : ''),
                     url: f.url,
                     contentLength: sizeBytes,
                     type: 'muxed',
@@ -69,7 +67,7 @@ async function extractFormats() {
             }
         }
         
-        // Process adaptive formats (separate video/audio, includes HD/4K/8K)
+        // Process adaptive formats (HD/4K/8K video-only, audio-only)
         if (streamingData.adaptiveFormats) {
             for (let f of streamingData.adaptiveFormats) {
                 if (!f.url) continue;
@@ -79,17 +77,28 @@ async function extractFormats() {
                 
                 if (isAudio) {
                     let bitrate = f.bitrate ? Math.round(f.bitrate / 1000) + 'kbps' : '';
+                    let codec = '';
+                    if (f.mimeType.includes('opus')) codec = 'opus';
+                    else if (f.mimeType.includes('mp4a')) codec = 'm4a';
+                    
                     videoFormats.push({
-                        label: '🔊 Audio ' + bitrate + (sizeMB ? ' — ' + sizeMB : ''),
+                        label: '🔊 Audio ' + bitrate + (codec ? ' (' + codec + ')' : '') + (sizeMB ? ' — ' + sizeMB : ''),
                         url: f.url,
                         contentLength: sizeBytes,
                         type: 'audio',
                         height: 0
                     });
                 } else {
-                    let fps = f.fps ? f.fps + 'fps' : '';
+                    let fps = f.fps ? ' ' + f.fps + 'fps' : '';
+                    let codec = '';
+                    if (f.mimeType) {
+                        if (f.mimeType.includes('avc1')) codec = 'H.264';
+                        else if (f.mimeType.includes('vp9') || f.mimeType.includes('vp09')) codec = 'VP9';
+                        else if (f.mimeType.includes('av01')) codec = 'AV1';
+                    }
+                    
                     videoFormats.push({
-                        label: '🎥 ' + (f.qualityLabel || f.height + 'p') + ' ' + fps + ' (Video Only)' + (sizeMB ? ' — ' + sizeMB : ''),
+                        label: '🎥 ' + (f.qualityLabel || f.height + 'p') + fps + (codec ? ' ' + codec : '') + ' (Video Only)' + (sizeMB ? ' — ' + sizeMB : ''),
                         url: f.url,
                         contentLength: sizeBytes,
                         type: 'video',
@@ -99,7 +108,7 @@ async function extractFormats() {
             }
         }
         
-        // Sort: muxed first, then video by height desc, then audio
+        // Sort: muxed first, then video by height desc, then audio by bitrate desc
         videoFormats.sort((a, b) => {
             if (a.type === 'muxed' && b.type !== 'muxed') return -1;
             if (a.type !== 'muxed' && b.type === 'muxed') return 1;
@@ -111,7 +120,7 @@ async function extractFormats() {
         console.log('HyperDM: Found ' + videoFormats.length + ' formats for "' + videoTitle + '"');
         
     } catch (err) {
-        console.error('HyperDM: Error extracting formats:', err);
+        console.error('HyperDM: Error calling YouTube API:', err);
     }
 }
 
@@ -120,16 +129,16 @@ extractFormats();
 
 // Re-extract on YouTube SPA navigation
 document.addEventListener('yt-navigate-finish', () => {
-    lastVideoId = ''; // Force re-extract
+    lastVideoId = '';
     setTimeout(extractFormats, 1000);
 });
 
-// Also watch URL changes via MutationObserver
+// Watch URL changes
 let navObserver = new MutationObserver(() => {
     let urlParams = new URLSearchParams(window.location.search);
     let currentId = urlParams.get('v');
     if (currentId && currentId !== lastVideoId) {
-        setTimeout(extractFormats, 1000);
+        setTimeout(extractFormats, 500);
     }
 });
 navObserver.observe(document.body, { childList: true, subtree: true });
@@ -151,17 +160,14 @@ function createUI() {
     dropdown.style.display = 'none';
     document.body.appendChild(dropdown);
     
-    // Keep UI visible when mouse is over it
     downloadBtn.addEventListener('mouseenter', () => { isMouseOverUI = true; });
     downloadBtn.addEventListener('mouseleave', () => { isMouseOverUI = false; });
     dropdown.addEventListener('mouseenter', () => { isMouseOverUI = true; });
     dropdown.addEventListener('mouseleave', () => { isMouseOverUI = false; });
     
-    // Click handler
     downloadBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         
-        // If no formats yet, try extracting now
         if (videoFormats.length === 0) {
             await extractFormats();
         }
@@ -186,7 +192,6 @@ function createUI() {
             
             item.addEventListener('click', (ev) => {
                 ev.stopPropagation();
-                
                 chrome.runtime.sendMessage({
                     action: "downloadMedia",
                     media: {
@@ -211,13 +216,12 @@ function createUI() {
         dropdown.style.display = 'block';
     });
     
-    // Hide on outside click
     document.addEventListener('click', () => {
         if (dropdown) dropdown.style.display = 'none';
     });
 }
 
-// ==================== STEP 3: Mouse Hover Detection ====================
+// ==================== STEP 3: Mouse Hover ====================
 document.addEventListener('mousemove', (e) => {
     let target = e.target;
     let isOverVideo = target && target.tagName && target.tagName.toLowerCase() === 'video';
