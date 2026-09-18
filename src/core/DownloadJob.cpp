@@ -59,14 +59,14 @@ void DownloadJob::fetch_file_size() {
         curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
         curl_easy_setopt(curl, CURLOPT_NOBODY, 1L); // HEAD request
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L); // For testing only
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         
-        struct curl_slist* chunk = NULL;
+        struct curl_slist* headers = NULL;
         for (const auto& [key, value] : request.headers) {
             std::string header = key + ": " + value;
-            chunk = curl_slist_append(chunk, header.c_str());
+            headers = curl_slist_append(headers, header.c_str());
         }
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
         
         CURLcode res = curl_easy_perform(curl);
         if (res == CURLE_OK) {
@@ -76,7 +76,34 @@ void DownloadJob::fetch_file_size() {
                 total_size = static_cast<size_t>(cl);
             }
         }
-        curl_slist_free_all(chunk);
+        
+        // IDM Hack: If HEAD fails or gives 0 size (like YouTube), try GET with Range 0-0
+        if (total_size == 0) {
+            curl_easy_setopt(curl, CURLOPT_NOBODY, 0L); // Change to GET
+            curl_easy_setopt(curl, CURLOPT_RANGE, "0-0"); // Ask for 1 byte
+            
+            // We just need headers to parse Content-Range
+            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, +[](char* buffer, size_t size, size_t nitems, void* userdata) -> size_t {
+                std::string header(buffer, size * nitems);
+                if (header.find("Content-Range:") != std::string::npos) {
+                    size_t slash_pos = header.find("/");
+                    if (slash_pos != std::string::npos) {
+                        std::string size_str = header.substr(slash_pos + 1);
+                        size_t* ts = static_cast<size_t*>(userdata);
+                        try { *ts = std::stoull(size_str); } catch(...) {}
+                    }
+                }
+                return size * nitems;
+            });
+            curl_easy_setopt(curl, CURLOPT_HEADERDATA, &total_size);
+            
+            // Discard the 1 byte body
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, +[](void*, size_t s, size_t n, void*) -> size_t { return s * n; });
+            
+            curl_easy_perform(curl);
+        }
+        
+        curl_slist_free_all(headers);
         curl_easy_cleanup(curl);
     }
 }

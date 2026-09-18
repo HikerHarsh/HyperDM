@@ -1,16 +1,29 @@
 {
   "manifest_version": 3,
   "name": "HyperDM - Video Grabber",
-  "version": "1.0",
-  "description": "Extracts video URLs and headers to send to HyperDM Core.",
+  "version": "1.1",
+  "description": "Intercepts video streams and sends them to HyperDM C++ Engine",
   "permissions": [
     "webRequest",
-    "nativeMessaging"
+    "nativeMessaging",
+    "tabs",
+    "storage"
   ],
   "host_permissions": [
-    "*://*/*"
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "css": ["content.css"],
+      "js": ["content.js"],
+      "all_frames": true
+    }
+  ],
+  "icons": {
+    "128": "icon.png"
   }
 }

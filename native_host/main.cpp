@@ -6,6 +6,7 @@
 #include <QCoreApplication>
 #include <QLocalSocket>
 #include <QProcess>
+#include <QThread>
 #include "../src/ipc/IpcDefines.h"
 
 #ifdef _WIN32

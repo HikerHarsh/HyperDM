@@ -1,9 +1,9 @@
 {
   "name": "com.hyperdm.core",
   "description": "HyperDM Native Messaging Host",
-  "path": "NativeHost.exe",
+  "path": "D:\\HyperDM\\build\\Release\\NativeHost.exe",
   "type": "stdio",
   "allowed_origins": [
-    "chrome-extension://<EXTENSION_ID_HERE>/"
+    "chrome-extension://fjdmimfalmjhnmdefkihhnfndcejeibm/"
   ]
 }

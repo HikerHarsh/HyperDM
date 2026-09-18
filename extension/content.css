@@ -1,0 +1,55 @@
+.hyperdm-download-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 999999;
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    display: none;
+    align-items: center;
+    gap: 6px;
+}
+
+.hyperdm-download-btn:hover {
+    background-color: #1976D2;
+}
+
+.hyperdm-dropdown {
+    position: absolute;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 999999;
+    max-height: 300px;
+    overflow-y: auto;
+    display: none;
+    min-width: 200px;
+}
+
+.hyperdm-dropdown-item {
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    color: #333;
+    display: flex;
+    justify-content: space-between;
+}
+
+.hyperdm-dropdown-item:hover {
+    background-color: #f5f5f5;
+}
+
+.hyperdm-dropdown-item:last-child {
+    border-bottom: none;
+}
