@@ -129,58 +129,78 @@ int main(int argc, char* argv[]) {
                     
                     std::string videoTitle = info.contains("title") ? info["title"].get<std::string>() : "Video";
                     
-                    for (auto& f : info["formats"]) {
-                        if (!f.contains("url") || !f.contains("resolution")) continue;
-                        
-                        int w = f.value("width", 0);
-                        int h = f.value("height", 0);
-                        std::string resLabel = f.value("resolution", "unknown");
-                        if (resLabel == "audio only") resLabel = "Audio";
-                        
-                        std::string badge = "";
-                        if (w >= 7680 || h >= 4320) badge = "8K";
-                        else if (w >= 3840 || h >= 2160) badge = "4K";
-                        else if (w >= 2560 || h >= 1440) badge = "2K";
-                        else if (w >= 1920 || h >= 1080) badge = "1080p";
-                        else if (w >= 1280 || h >= 720) badge = "720p";
-                        else if (w >= 854 || h >= 480) badge = "480p";
-                        else if (w >= 640 || h >= 360) badge = "360p";
-                        
-                        std::string ext = f.value("ext", "mp4");
-                        
-                        double sizeMB = 0;
-                        if (f.contains("filesize") && !f["filesize"].is_null()) {
-                            sizeMB = f["filesize"].get<double>() / (1024 * 1024);
-                        } else if (f.contains("filesize_approx") && !f["filesize_approx"].is_null()) {
-                            sizeMB = f["filesize_approx"].get<double>() / (1024 * 1024);
+                    if (info.contains("formats") && info["formats"].is_array() && !info["formats"].empty()) {
+                        for (auto& f : info["formats"]) {
+                            if (!f.contains("url") || !f.contains("resolution")) continue;
+                            
+                            int w = f.value("width", 0);
+                            int h = f.value("height", 0);
+                            std::string resLabel = f.value("resolution", "unknown");
+                            if (resLabel == "audio only") resLabel = "Audio";
+                            
+                            std::string badge = "";
+                            if (w >= 7680 || h >= 4320) badge = "8K";
+                            else if (w >= 3840 || h >= 2160) badge = "4K";
+                            else if (w >= 2560 || h >= 1440) badge = "2K";
+                            else if (w >= 1920 || h >= 1080) badge = "1080p";
+                            else if (w >= 1280 || h >= 720) badge = "720p";
+                            else if (w >= 854 || h >= 480) badge = "480p";
+                            else if (w >= 640 || h >= 360) badge = "360p";
+                            
+                            std::string ext = f.value("ext", "mp4");
+                            
+                            double sizeMB = 0;
+                            if (f.contains("filesize") && !f["filesize"].is_null()) {
+                                sizeMB = f["filesize"].get<double>() / (1024 * 1024);
+                            } else if (f.contains("filesize_approx") && !f["filesize_approx"].is_null()) {
+                                sizeMB = f["filesize_approx"].get<double>() / (1024 * 1024);
+                            }
+                            
+                            std::string formatLabel;
+                            if (!badge.empty()) {
+                                formatLabel = "[" + badge + "] " + resLabel + " (" + ext + ")";
+                            } else {
+                                formatLabel = resLabel + " (" + ext + ")";
+                            }
+                            
+                            if (sizeMB > 0) {
+                                char sizeStr[32];
+                                snprintf(sizeStr, sizeof(sizeStr), "%.1f MB", sizeMB);
+                                formatLabel += std::string(" | ") + sizeStr;
+                            }
+                            
+                            json item;
+                            item["label"] = formatLabel;
+                            item["url"] = f["url"];
+                            item["format_id"] = f.contains("format_id") ? f["format_id"].get<std::string>() : "";
+                            item["title"] = videoTitle;
+                            formatList.push_back(item);
                         }
-                        
-                        std::string formatLabel;
-                        if (!badge.empty()) {
-                            formatLabel = "[" + badge + "] " + resLabel + " (" + ext + ")";
-                        } else {
-                            formatLabel = resLabel + " (" + ext + ")";
-                        }
-                        
-                        if (sizeMB > 0) {
-                            char sizeStr[32];
-                            snprintf(sizeStr, sizeof(sizeStr), "%.1f MB", sizeMB);
-                            formatLabel += std::string(" | ") + sizeStr;
-                        }
-                        
+                    } else if (info.contains("url")) {
+                        // Direct file / generic fallback
+                        std::string resLabel = info.value("resolution", "Direct Stream");
+                        std::string ext = info.value("ext", "mp4");
                         json item;
-                        item["label"] = formatLabel;
-                        item["url"] = f["url"];
-                        item["format_id"] = f.contains("format_id") ? f["format_id"].get<std::string>() : "";
+                        item["label"] = resLabel + " (" + ext + ")";
+                        item["url"] = info["url"];
+                        item["format_id"] = info.value("format_id", "");
                         item["title"] = videoTitle;
                         formatList.push_back(item);
                     }
                     
-                    json response = {
-                        {"status", "success"},
-                        {"formats", formatList}
-                    };
-                    write_message(response.dump());
+                    if (formatList.empty()) {
+                        json error_resp = {
+                            {"status", "error"},
+                            {"message", "No downloadable streams found by yt-dlp."}
+                        };
+                        write_message(error_resp.dump());
+                    } else {
+                        json response = {
+                            {"status", "success"},
+                            {"formats", formatList}
+                        };
+                        write_message(response.dump());
+                    }
                 } catch (const std::exception& e) {
                     json error_resp = {
                         {"status", "error"},
