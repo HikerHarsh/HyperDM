@@ -167,6 +167,7 @@ void MainWindow::onNewIpcConnection() {
                     args << "-m" << "yt_dlp" 
                          << "-f" << QString::fromStdString(format_id + "+bestaudio/best")
                          << "--merge-output-format" << "mp4"
+                         << "--cookies-from-browser" << "brave"
                          << "-o" << savePath
                          << "--newline"
                          << QString::fromStdString(url);
@@ -183,6 +184,18 @@ void MainWindow::onNewIpcConnection() {
                                 QString pctStr = out.mid(startIdx + 1, percentIdx - startIdx - 1);
                                 downloadTable->item(row, 2)->setText(pctStr + "%");
                                 downloadTable->item(row, 4)->setText("Downloading (yt-dlp)");
+                            }
+                        }
+                        
+                        int atIdx = out.indexOf(" at ");
+                        if (atIdx != -1) {
+                            int etaIdx = out.indexOf(" ETA", atIdx);
+                            if (etaIdx != -1) {
+                                QString speedStr = out.mid(atIdx + 4, etaIdx - atIdx - 4).trimmed();
+                                downloadTable->item(row, 3)->setText(speedStr);
+                            } else {
+                                QString speedStr = out.mid(atIdx + 4).trimmed();
+                                downloadTable->item(row, 3)->setText(speedStr);
                             }
                         }
                     });
