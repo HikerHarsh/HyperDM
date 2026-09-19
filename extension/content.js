@@ -116,22 +116,33 @@ function createUI() {
 }
 
 document.addEventListener('mousemove', (e) => {
-    let target = e.target;
-    let isOverVideo = target && target.tagName && target.tagName.toLowerCase() === 'video';
+    let videos = document.getElementsByTagName('video');
+    let targetVideo = null;
     
-    if (isOverVideo) {
+    for (let vid of videos) {
+        let rect = vid.getBoundingClientRect();
+        // Check if mouse is inside the video's bounding rect
+        if (e.clientX >= rect.left && e.clientX <= rect.right &&
+            e.clientY >= rect.top && e.clientY <= rect.bottom) {
+            targetVideo = vid;
+            break;
+        }
+    }
+    
+    if (targetVideo) {
         createUI();
-        const rect = target.getBoundingClientRect();
+        const rect = targetVideo.getBoundingClientRect();
         downloadBtn.style.top = (rect.top + window.scrollY + 10) + 'px';
         downloadBtn.style.left = (rect.right + window.scrollX - 195) + 'px';
         downloadBtn.style.display = 'flex';
         clearTimeout(hoverTimer);
-    } else if (!isMouseOverBtn) {
+    } else if (!isMouseOverUI) {
         if (downloadBtn && downloadBtn.style.display !== 'none') {
             clearTimeout(hoverTimer);
             hoverTimer = setTimeout(() => {
-                if (!isMouseOverBtn) {
+                if (!isMouseOverUI) {
                     downloadBtn.style.display = 'none';
+                    if (dropdown) dropdown.style.display = 'none';
                 }
             }, 1000);
         }
