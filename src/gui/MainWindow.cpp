@@ -4,6 +4,11 @@
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QLocalSocket>
+#include <QDialog>
+#include <QVBoxLayout>
+#include <QLabel>
+#include <QProcess>
+#include <QComboBox>
 #include <nlohmann/json.hpp>
 #include "../ipc/IpcDefines.h"
 #include "../core/DownloadJob.h"
@@ -40,6 +45,77 @@ void MainWindow::onNewIpcConnection() {
             json payload = json::parse(data.toStdString());
             if (payload["action"] == "download") {
                 std::string url = payload["url"];
+                std::string title = payload.contains("title") ? payload["title"].get<std::string>() : "Video";
+                std::string format = payload.contains("format") ? payload["format"].get<std::string>() : "";
+                
+                if (format == "yt-dlp") {
+                    // Start yt-dlp to get formats
+                    QDialog loadingDialog(this);
+                    loadingDialog.setWindowTitle("HyperDM - Loading Formats");
+                    QVBoxLayout* layout = new QVBoxLayout(&loadingDialog);
+                    QLabel* label = new QLabel("Fetching available qualities from YouTube using yt-dlp...", &loadingDialog);
+                    layout->addWidget(label);
+                    loadingDialog.setFixedSize(350, 100);
+                    
+                    QProcess ytdlpProcess;
+                    ytdlpProcess.start("yt-dlp", QStringList() << "-j" << "--no-warnings" << QString::fromStdString(url));
+                    
+                    loadingDialog.show();
+                    
+                    // Wait for process to finish
+                    if (!ytdlpProcess.waitForFinished(15000)) { // 15s timeout
+                        loadingDialog.close();
+                        QMessageBox::critical(this, "Error", "Failed to load formats (timeout). Is yt-dlp installed?");
+                        return;
+                    }
+                    
+                    loadingDialog.close();
+                    
+                    QByteArray output = ytdlpProcess.readAllStandardOutput();
+                    try {
+                        json info = json::parse(output.toStdString());
+                        
+                        QDialog selectDialog(this);
+                        selectDialog.setWindowTitle("Select Video Quality");
+                        QVBoxLayout* selLayout = new QVBoxLayout(&selectDialog);
+                        QComboBox* combo = new QComboBox(&selectDialog);
+                        
+                        std::vector<std::string> formatUrls;
+                        
+                        for (auto& f : info["formats"]) {
+                            if (!f.contains("url") || !f.contains("resolution")) continue;
+                            std::string res = f["resolution"];
+                            if (res == "audio only") res = "Audio";
+                            std::string ext = f.contains("ext") ? f["ext"].get<std::string>() : "";
+                            
+                            combo->addItem(QString::fromStdString(res + " (" + ext + ")"));
+                            formatUrls.push_back(f["url"]);
+                        }
+                        
+                        selLayout->addWidget(new QLabel("Available qualities:", &selectDialog));
+                        selLayout->addWidget(combo);
+                        
+                        QPushButton* btnOk = new QPushButton("Download", &selectDialog);
+                        selLayout->addWidget(btnOk);
+                        connect(btnOk, &QPushButton::clicked, &selectDialog, &QDialog::accept);
+                        
+                        if (selectDialog.exec() == QDialog::Accepted) {
+                            int idx = combo->currentIndex();
+                            if (idx >= 0 && idx < formatUrls.size()) {
+                                url = formatUrls[idx];
+                            } else {
+                                return;
+                            }
+                        } else {
+                            return;
+                        }
+                        
+                    } catch (...) {
+                        QMessageBox::critical(this, "Error", "Failed to parse yt-dlp output.");
+                        return;
+                    }
+                }
+                
                 DownloadRequest req;
                 req.url = url;
                 if (payload.contains("headers")) {
