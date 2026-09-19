@@ -95,15 +95,23 @@ int main(int argc, char* argv[]) {
                 if (!ytdlpProcess.waitForFinished(15000)) { // 15s timeout
                     json error_resp = {
                         {"status", "error"},
-                        {"message", "Failed to load formats (timeout)."}
+                        {"message", "Timeout waiting for yt-dlp"}
                     };
                     write_message(error_resp.dump());
                     continue;
                 }
                 
                 QByteArray output = ytdlpProcess.readAllStandardOutput();
+                std::string outStr = output.toStdString();
+                
+                // Strip anything before the first '{' to ignore warnings/BOM
+                size_t firstBrace = outStr.find('{');
+                if (firstBrace != std::string::npos && firstBrace > 0) {
+                    outStr = outStr.substr(firstBrace);
+                }
+                
                 try {
-                    json info = json::parse(output.toStdString());
+                    json info = json::parse(outStr);
                     json formatList = json::array();
                     
                     std::string videoTitle = info.contains("title") ? info["title"].get<std::string>() : "Video";
