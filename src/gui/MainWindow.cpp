@@ -167,7 +167,6 @@ void MainWindow::onNewIpcConnection() {
                     args << "-m" << "yt_dlp" 
                          << "-f" << QString::fromStdString(format_id + "+bestaudio/best")
                          << "--merge-output-format" << "mp4"
-                         << "--cookies-from-browser" << "brave"
                          << "-o" << savePath
                          << "--newline"
                          << QString::fromStdString(url);
@@ -175,27 +174,33 @@ void MainWindow::onNewIpcConnection() {
                     p->start("python", args);
                     
                     connect(p, &QProcess::readyReadStandardOutput, this, [this, p, row]() {
-                        QString out = QString::fromUtf8(p->readAllStandardOutput());
-                        // Parse: [download]  45.0% of 50.00MiB at 3.00MiB/s ETA 00:00
-                        int percentIdx = out.indexOf("%");
-                        if (percentIdx > 10) {
-                            int startIdx = out.lastIndexOf(" ", percentIdx - 1);
-                            if (startIdx != -1) {
-                                QString pctStr = out.mid(startIdx + 1, percentIdx - startIdx - 1);
-                                downloadTable->item(row, 2)->setText(pctStr + "%");
-                                downloadTable->item(row, 4)->setText("Downloading (yt-dlp)");
-                            }
-                        }
+                        QString rawOut = QString::fromUtf8(p->readAllStandardOutput());
+                        QStringList lines = rawOut.split('\n', Qt::SkipEmptyParts);
                         
-                        int atIdx = out.indexOf(" at ");
-                        if (atIdx != -1) {
-                            int etaIdx = out.indexOf(" ETA", atIdx);
-                            if (etaIdx != -1) {
-                                QString speedStr = out.mid(atIdx + 4, etaIdx - atIdx - 4).trimmed();
-                                downloadTable->item(row, 3)->setText(speedStr);
-                            } else {
-                                QString speedStr = out.mid(atIdx + 4).trimmed();
-                                downloadTable->item(row, 3)->setText(speedStr);
+                        for (const QString& out : lines) {
+                            if (!out.contains("[download]")) continue;
+                            
+                            // Parse: [download]  45.0% of 50.00MiB at 3.00MiB/s ETA 00:00
+                            int percentIdx = out.indexOf("%");
+                            if (percentIdx > 10) {
+                                int startIdx = out.lastIndexOf(" ", percentIdx - 1);
+                                if (startIdx != -1) {
+                                    QString pctStr = out.mid(startIdx + 1, percentIdx - startIdx - 1);
+                                    downloadTable->item(row, 2)->setText(pctStr + "%");
+                                    downloadTable->item(row, 4)->setText("Downloading (yt-dlp)");
+                                }
+                            }
+                            
+                            int atIdx = out.indexOf(" at ");
+                            if (atIdx != -1) {
+                                int etaIdx = out.indexOf(" ETA", atIdx);
+                                if (etaIdx != -1) {
+                                    QString speedStr = out.mid(atIdx + 4, etaIdx - atIdx - 4).trimmed();
+                                    downloadTable->item(row, 3)->setText(speedStr);
+                                } else {
+                                    QString speedStr = out.mid(atIdx + 4).trimmed();
+                                    downloadTable->item(row, 3)->setText(speedStr);
+                                }
                             }
                         }
                     });

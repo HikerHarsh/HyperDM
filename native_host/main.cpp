@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
                 std::string url = payload["url"];
                 
                 QProcess ytdlpProcess;
-                ytdlpProcess.start("python", QStringList() << "-m" << "yt_dlp" << "-j" << "--cookies-from-browser" << "brave" << "--no-warnings" << QString::fromStdString(url));
+                ytdlpProcess.start("python", QStringList() << "-m" << "yt_dlp" << "-j" << "--no-warnings" << QString::fromStdString(url));
                 
                 if (!ytdlpProcess.waitForFinished(15000)) { // 15s timeout
                     json error_resp = {
