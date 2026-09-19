@@ -87,26 +87,11 @@ int main(int argc, char* argv[]) {
                     };
                     write_message(error_resp.dump());
                 }
-            }
             else if (payload["action"] == "getFormats") {
                 std::string url = payload["url"];
-                QStringList args;
-                args << "-m" << "yt_dlp" << "-j" << "--no-warnings" << QString::fromStdString(url);
-                
-                if (payload.contains("cookies")) {
-                    std::string cookieStr = payload["cookies"].get<std::string>();
-                    QString cookiePath = QDir::tempPath() + "/hyperdm_cookies.txt";
-                    QFile file(cookiePath);
-                    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-                        file.write(cookieStr.c_str());
-                        file.close();
-                        args.prepend(cookiePath);
-                        args.prepend("--cookies");
-                    }
-                }
                 
                 QProcess ytdlpProcess;
-                ytdlpProcess.start("python", args);
+                ytdlpProcess.start("python", QStringList() << "-m" << "yt_dlp" << "-j" << "--no-warnings" << QString::fromStdString(url));
                 
                 if (!ytdlpProcess.waitForFinished(15000)) { // 15s timeout
                     json error_resp = {
@@ -124,6 +109,19 @@ int main(int argc, char* argv[]) {
                 size_t firstBrace = outStr.find('{');
                 if (firstBrace != std::string::npos && firstBrace > 0) {
                     outStr = outStr.substr(firstBrace);
+                }
+                
+                if (outStr.empty()) {
+                    QByteArray errOutput = ytdlpProcess.readAllStandardError();
+                    std::string errStr = errOutput.toStdString();
+                    if (errStr.empty()) errStr = "Unknown yt-dlp error (no output)";
+                    
+                    json error_resp = {
+                        {"status", "error"},
+                        {"message", errStr}
+                    };
+                    write_message(error_resp.dump());
+                    continue;
                 }
                 
                 try {
