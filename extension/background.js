@@ -13,7 +13,7 @@ function getNetscapeCookies(callback) {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "downloadMedia") {
-        let port = chrome.runtime.connectNative('com.hyperdm.native');
+        let port = chrome.runtime.connectNative('com.hyperdm.core');
         getNetscapeCookies((cookies) => {
             port.postMessage({
                 action: "download",
@@ -28,7 +28,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
     else if (request.action === "getFormats") {
-        let port = chrome.runtime.connectNative('com.hyperdm.native');
+        let port = chrome.runtime.connectNative('com.hyperdm.core');
         getNetscapeCookies((cookies) => {
             port.postMessage({
                 action: "getFormats",
