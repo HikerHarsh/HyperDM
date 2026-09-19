@@ -87,7 +87,8 @@ function createUI() {
                     chrome.runtime.sendMessage({
                         action: "downloadMedia",
                         media: {
-                            url: fmt.url,
+                            url: videoUrl, // Use original URL
+                            format_id: fmt.format_id,
                             title: fmt.title,
                             format: fmt.label,
                             contentLength: 0,

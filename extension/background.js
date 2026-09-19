@@ -7,6 +7,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         port.postMessage({
             action: "download",
             url: request.media.url,
+            format_id: request.media.format_id || "",
             title: request.media.title || "video",
             format: request.media.format || "unknown",
             mimeType: request.media.mimeType || "",

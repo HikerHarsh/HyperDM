@@ -133,6 +133,7 @@ int main(int argc, char* argv[]) {
                         json item;
                         item["label"] = formatLabel;
                         item["url"] = f["url"];
+                        item["format_id"] = f.contains("format_id") ? f["format_id"].get<std::string>() : "";
                         item["title"] = videoTitle;
                         formatList.push_back(item);
                     }

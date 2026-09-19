@@ -10,8 +10,10 @@
 
 struct DownloadRequest {
     std::string url;
-    std::map<std::string, std::string> headers;
+    std::string audio_url; // Optional: For YouTube separate audio stream
     std::string output_path;
+    std::map<std::string, std::string> headers;
+    int num_threads = 8;
 };
 
 class DownloadJob : public QObject {
