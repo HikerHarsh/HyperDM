@@ -4,6 +4,8 @@
 #include <vector>
 #include <nlohmann/json.hpp>
 #include <QCoreApplication>
+#include <QDir>
+#include <QFile>
 #include <QLocalSocket>
 #include <QProcess>
 #include <QThread>
@@ -88,9 +90,23 @@ int main(int argc, char* argv[]) {
             }
             else if (payload["action"] == "getFormats") {
                 std::string url = payload["url"];
+                QStringList args;
+                args << "-m" << "yt_dlp" << "-j" << "--no-warnings" << QString::fromStdString(url);
+                
+                if (payload.contains("cookies")) {
+                    std::string cookieStr = payload["cookies"].get<std::string>();
+                    QString cookiePath = QDir::tempPath() + "/hyperdm_cookies.txt";
+                    QFile file(cookiePath);
+                    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                        file.write(cookieStr.c_str());
+                        file.close();
+                        args.prepend(cookiePath);
+                        args.prepend("--cookies");
+                    }
+                }
                 
                 QProcess ytdlpProcess;
-                ytdlpProcess.start("python", QStringList() << "-m" << "yt_dlp" << "-j" << "--no-warnings" << QString::fromStdString(url));
+                ytdlpProcess.start("python", args);
                 
                 if (!ytdlpProcess.waitForFinished(15000)) { // 15s timeout
                     json error_resp = {
