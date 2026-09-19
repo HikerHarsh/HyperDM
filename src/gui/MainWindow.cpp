@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QProcess>
 #include <QComboBox>
+#include <QRegularExpression>
 #include <nlohmann/json.hpp>
 #include "../ipc/IpcDefines.h"
 #include "../core/DownloadJob.h"
@@ -127,6 +128,9 @@ void MainWindow::onNewIpcConnection() {
                     }
                 }
                 
+                QString safeTitle = QString::fromStdString(title);
+                safeTitle.replace(QRegularExpression("[\\\\/:*?\"<>|]"), "-");
+                
                 std::string format_id = payload.contains("format_id") ? payload["format_id"].get<std::string>() : "";
                 
                 // Show confirmation popup with save directory option
@@ -138,7 +142,7 @@ void MainWindow::onNewIpcConnection() {
                 }
                 
                 QString savePath = QFileDialog::getSaveFileName(this, "Save Video As",
-                                    QDir::homePath() + "/Downloads/" + QString::fromStdString(title) + ".mp4",
+                                    QDir::homePath() + "/Downloads/" + safeTitle + ".mp4",
                                     "Videos (*.mp4 *.mkv *.ts);;All Files (*.*)");
                 if (savePath.isEmpty()) {
                     return;
