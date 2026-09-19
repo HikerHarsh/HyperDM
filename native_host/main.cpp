@@ -85,29 +85,12 @@ int main(int argc, char* argv[]) {
                     };
                     write_message(error_resp.dump());
                 }
+            }
             else if (payload["action"] == "getFormats") {
                 std::string url = payload["url"];
-                QStringList args;
-                args << "-X" << "utf8" << "-m" << "yt_dlp" << "-j" << "--no-warnings";
-                
-                if (payload.contains("cookies")) {
-                    std::string cookieStr = payload["cookies"].get<std::string>();
-                    QString cookiePath = QDir::tempPath() + "/hyperdm_cookies.txt";
-                    QFile file(cookiePath);
-                    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-                        file.write(cookieStr.c_str());
-                        file.close();
-                        args << "--cookies" << cookiePath;
-                    }
-                }
-                if (payload.contains("userAgent")) {
-                    args << "--user-agent" << QString::fromStdString(payload["userAgent"].get<std::string>());
-                }
-                
-                args << QString::fromStdString(url);
                 
                 QProcess ytdlpProcess;
-                ytdlpProcess.start("python", args);
+                ytdlpProcess.start("python", QStringList() << "-X" << "utf8" << "-m" << "yt_dlp" << "-j" << "--no-warnings" << QString::fromStdString(url));
                 
                 if (!ytdlpProcess.waitForFinished(15000)) { // 15s timeout
                     json error_resp = {
