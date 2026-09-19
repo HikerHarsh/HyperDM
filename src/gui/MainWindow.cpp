@@ -164,7 +164,8 @@ void MainWindow::onNewIpcConnection() {
                     
                     // -f format_id+bestaudio --merge-output-format mp4
                     QStringList args;
-                    args << "-m" << "yt_dlp" 
+                    args << "-X" << "utf8"
+                         << "-m" << "yt_dlp" 
                          << "-f" << QString::fromStdString(format_id + "+bestaudio/best")
                          << "--merge-output-format" << "mp4"
                          << "-o" << savePath

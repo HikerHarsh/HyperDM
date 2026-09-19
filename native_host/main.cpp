@@ -90,20 +90,41 @@ int main(int argc, char* argv[]) {
                 std::string url = payload["url"];
                 
                 QProcess ytdlpProcess;
-                ytdlpProcess.start("python", QStringList() << "-m" << "yt_dlp" << "-j" << "--no-warnings" << QString::fromStdString(url));
+                ytdlpProcess.start("python", QStringList() << "-X" << "utf8" << "-m" << "yt_dlp" << "-j" << "--no-warnings" << QString::fromStdString(url));
                 
                 if (!ytdlpProcess.waitForFinished(15000)) { // 15s timeout
                     json error_resp = {
                         {"status", "error"},
-                        {"message", "Failed to load formats (timeout)."}
+                        {"message", "Timeout waiting for yt-dlp"}
                     };
                     write_message(error_resp.dump());
                     continue;
                 }
                 
                 QByteArray output = ytdlpProcess.readAllStandardOutput();
+                std::string outStr = output.toStdString();
+                
+                // Strip anything before the first '{' to ignore warnings/BOM
+                size_t firstBrace = outStr.find('{');
+                if (firstBrace != std::string::npos && firstBrace > 0) {
+                    outStr = outStr.substr(firstBrace);
+                }
+                
+                if (outStr.empty()) {
+                    QByteArray errOutput = ytdlpProcess.readAllStandardError();
+                    std::string errStr = errOutput.toStdString();
+                    if (errStr.empty()) errStr = "Unknown yt-dlp error (no output)";
+                    
+                    json error_resp = {
+                        {"status", "error"},
+                        {"message", errStr}
+                    };
+                    write_message(error_resp.dump());
+                    continue;
+                }
+                
                 try {
-                    json info = json::parse(output.toStdString());
+                    json info = json::parse(outStr);
                     json formatList = json::array();
                     
                     std::string videoTitle = info.contains("title") ? info["title"].get<std::string>() : "Video";
@@ -111,17 +132,34 @@ int main(int argc, char* argv[]) {
                     for (auto& f : info["formats"]) {
                         if (!f.contains("url") || !f.contains("resolution")) continue;
                         
-                        std::string res = f["resolution"];
-                        if (res == "audio only") res = "Audio";
+                        int w = f.value("width", 0);
+                        int h = f.value("height", 0);
+                        std::string resLabel = f.value("resolution", "unknown");
+                        if (resLabel == "audio only") resLabel = "Audio";
                         
-                        std::string ext = f.contains("ext") ? f["ext"].get<std::string>() : "";
-                        std::string formatLabel = res + " (" + ext + ")";
+                        std::string badge = "";
+                        if (w >= 7680 || h >= 4320) badge = "8K";
+                        else if (w >= 3840 || h >= 2160) badge = "4K";
+                        else if (w >= 2560 || h >= 1440) badge = "2K";
+                        else if (w >= 1920 || h >= 1080) badge = "1080p";
+                        else if (w >= 1280 || h >= 720) badge = "720p";
+                        else if (w >= 854 || h >= 480) badge = "480p";
+                        else if (w >= 640 || h >= 360) badge = "360p";
+                        
+                        std::string ext = f.value("ext", "mp4");
                         
                         double sizeMB = 0;
                         if (f.contains("filesize") && !f["filesize"].is_null()) {
                             sizeMB = f["filesize"].get<double>() / (1024 * 1024);
                         } else if (f.contains("filesize_approx") && !f["filesize_approx"].is_null()) {
                             sizeMB = f["filesize_approx"].get<double>() / (1024 * 1024);
+                        }
+                        
+                        std::string formatLabel;
+                        if (!badge.empty()) {
+                            formatLabel = "[" + badge + "] " + resLabel + " (" + ext + ")";
+                        } else {
+                            formatLabel = resLabel + " (" + ext + ")";
                         }
                         
                         if (sizeMB > 0) {
