@@ -86,6 +86,70 @@ int main(int argc, char* argv[]) {
                     write_message(error_resp.dump());
                 }
             }
+            else if (payload["action"] == "getFormats") {
+                std::string url = payload["url"];
+                
+                QProcess ytdlpProcess;
+                ytdlpProcess.start("python", QStringList() << "-m" << "yt_dlp" << "-j" << "--no-warnings" << QString::fromStdString(url));
+                
+                if (!ytdlpProcess.waitForFinished(15000)) { // 15s timeout
+                    json error_resp = {
+                        {"status", "error"},
+                        {"message", "Failed to load formats (timeout)."}
+                    };
+                    write_message(error_resp.dump());
+                    continue;
+                }
+                
+                QByteArray output = ytdlpProcess.readAllStandardOutput();
+                try {
+                    json info = json::parse(output.toStdString());
+                    json formatList = json::array();
+                    
+                    std::string videoTitle = info.contains("title") ? info["title"].get<std::string>() : "Video";
+                    
+                    for (auto& f : info["formats"]) {
+                        if (!f.contains("url") || !f.contains("resolution")) continue;
+                        
+                        std::string res = f["resolution"];
+                        if (res == "audio only") res = "Audio";
+                        
+                        std::string ext = f.contains("ext") ? f["ext"].get<std::string>() : "";
+                        std::string formatLabel = res + " (" + ext + ")";
+                        
+                        double sizeMB = 0;
+                        if (f.contains("filesize") && !f["filesize"].is_null()) {
+                            sizeMB = f["filesize"].get<double>() / (1024 * 1024);
+                        } else if (f.contains("filesize_approx") && !f["filesize_approx"].is_null()) {
+                            sizeMB = f["filesize_approx"].get<double>() / (1024 * 1024);
+                        }
+                        
+                        if (sizeMB > 0) {
+                            char sizeStr[32];
+                            snprintf(sizeStr, sizeof(sizeStr), "%.1f MB", sizeMB);
+                            formatLabel += std::string(" | ") + sizeStr;
+                        }
+                        
+                        json item;
+                        item["label"] = formatLabel;
+                        item["url"] = f["url"];
+                        item["title"] = videoTitle;
+                        formatList.push_back(item);
+                    }
+                    
+                    json response = {
+                        {"status", "success"},
+                        {"formats", formatList}
+                    };
+                    write_message(response.dump());
+                } catch (const std::exception& e) {
+                    json error_resp = {
+                        {"status", "error"},
+                        {"message", "Failed to parse yt-dlp output."}
+                    };
+                    write_message(error_resp.dump());
+                }
+            }
         } catch (const std::exception& e) {
             json error_resp = {
                 {"status", "error"},

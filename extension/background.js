@@ -14,16 +14,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             headers: request.media.headers || {}
         });
         
+        sendResponse({status: "sent"});
+        return true;
+    }
+    else if (request.action === "getFormats") {
+        let port = chrome.runtime.connectNative('com.hyperdm.core');
+        port.postMessage({
+            action: "getFormats",
+            url: request.url
+        });
+        
         port.onMessage.addListener((msg) => {
-            console.log("HyperDM Native Host response:", msg);
+            sendResponse(msg);
+            port.disconnect();
         });
         
         port.onDisconnect.addListener(() => {
             if (chrome.runtime.lastError) {
-                console.error("Native Host Disconnected:", chrome.runtime.lastError.message);
+                sendResponse({status: "error", message: chrome.runtime.lastError.message});
             }
         });
-        sendResponse({status: "sent"});
+        return true; // async response
     }
-    return true;
+    return false;
 });
