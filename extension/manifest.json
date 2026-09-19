@@ -7,7 +7,8 @@
     "nativeMessaging",
     "tabs",
     "storage",
-    "cookies"
+    "cookies",
+    "webRequest"
   ],
   "host_permissions": [
     "*://*.youtube.com/*",
