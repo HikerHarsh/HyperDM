@@ -104,6 +104,10 @@ int main(int argc, char* argv[]) {
                 QByteArray output = ytdlpProcess.readAllStandardOutput();
                 std::string outStr = output.toStdString();
                 
+                // Trim whitespace manually
+                outStr.erase(0, outStr.find_first_not_of(" \n\r\t"));
+                outStr.erase(outStr.find_last_not_of(" \n\r\t") + 1);
+                
                 // Strip anything before the first '{' to ignore warnings/BOM
                 size_t firstBrace = outStr.find('{');
                 if (firstBrace != std::string::npos && firstBrace > 0) {
