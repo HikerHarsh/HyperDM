@@ -162,32 +162,13 @@ void MainWindow::onNewIpcConnection() {
                     // It's a YouTube download via yt-dlp!
                     QProcess* p = new QProcess(this);
                     
-                    QString cookiePath = "";
-                    if (payload.contains("cookies")) {
-                        std::string cookieStr = payload["cookies"].get<std::string>();
-                        cookiePath = QDir::tempPath() + "/hyperdm_cookies.txt";
-                        QFile file(cookiePath);
-                        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-                            file.write(cookieStr.c_str());
-                            file.close();
-                        }
-                    }
-                    
                     // -f format_id+bestaudio --merge-output-format mp4
                     QStringList args;
                     args << "-X" << "utf8"
                          << "-m" << "yt_dlp" 
                          << "-f" << QString::fromStdString(format_id + "+bestaudio/best")
-                         << "--merge-output-format" << "mp4";
-                         
-                    if (!cookiePath.isEmpty()) {
-                        args << "--cookies" << cookiePath;
-                    }
-                    if (payload.contains("userAgent")) {
-                        args << "--user-agent" << QString::fromStdString(payload["userAgent"].get<std::string>());
-                    }
-                    
-                    args << "-o" << savePath
+                         << "--merge-output-format" << "mp4"
+                         << "-o" << savePath
                          << "--newline"
                          << QString::fromStdString(url);
                          
